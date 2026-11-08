@@ -254,24 +254,49 @@ $("new").onclick=()=>{
  setStatus("intakeStatus","No draft selected.");setStatus("tech","Choose a draft to begin.");setStatus("transcriptStatus","Transcription has not run.");setStatus("renderStatus","No final video created.");progress(0);setLog("Ready.")
 };
 async function syntheticTest(){
- const canvas=document.createElement("canvas");canvas.width=320;canvas.height=180;const ctx=canvas.getContext("2d");
- const stream=canvas.captureStream(12);const rec=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("video/webm;codecs=vp8")?"video/webm;codecs=vp8":"video/webm"});
- const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
- let t=0;const draw=()=>{ctx.fillStyle="#13243a";ctx.fillRect(0,0,320,180);ctx.fillStyle="#80b4ff";ctx.font="bold 22px sans-serif";ctx.fillText("SYNTHETIC TEST",48,85);ctx.fillStyle="#fff";ctx.font="14px sans-serif";ctx.fillText("Browser Video Studio",70,115);t++};
- const timer=setInterval(draw,1000/12);rec.start();await new Promise(r=>setTimeout(r,2500));clearInterval(timer);rec.stop();await new Promise(r=>rec.onstop=r);stream.getTracks().forEach(x=>x.stop());
- const webm=new Blob(chunks,{type:"video/webm"});if(!webm.size)throw new Error("Synthetic MediaRecorder generation failed.");
- const ff=await loadFFmpeg();await ff.writeFile("synthetic-test.webm",new Uint8Array(await webm.arrayBuffer()));
- await ff.exec(["-i","synthetic-test.webm","-c:v","libx264","-pix_fmt","yuv420p","-an","synthetic-test.mp4"]);
- const out=await ff.readFile("synthetic-test.mp4");if(!out.length)throw new Error("Synthetic MP4 render was empty.");
- const b=new Blob([out.buffer],{type:"video/mp4"}),u=URL.createObjectURL(b),v=document.createElement("video");
- await new Promise((res,rej)=>{v.onloadedmetadata=res;v.onerror=()=>rej(new Error("Synthetic MP4 could not be decoded."));v.src=u});
- if(!v.duration||v.videoWidth!==320)throw new Error("Synthetic output validation mismatch.");
- URL.revokeObjectURL(u);return {source:webm.size,output:b.size,duration:v.duration,width:v.videoWidth};
-}
-$("test").onclick=async()=>{
+  let stage="checking browser media support";
+  let stream=null,timer=null,objectUrl=null;
+  try{
+   if(!window.MediaRecorder)throw new Error("This browser does not support MediaRecorder.");
+   const canvas=document.createElement("canvas");canvas.width=320;canvas.height=180;const ctx=canvas.getContext("2d");
+   if(!ctx||!canvas.captureStream)throw new Error("Canvas capture is not supported in this browser.");
+   stream=canvas.captureStream(12);
+   const mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp8")?"video/webm;codecs=vp8":"video/webm";
+   const rec=new MediaRecorder(stream,{mimeType:mime}),chunks=[];
+   rec.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
+   const draw=()=>{ctx.fillStyle="#13243a";ctx.fillRect(0,0,320,180);ctx.fillStyle="#80b4ff";ctx.font="bold 22px sans-serif";ctx.fillText("SYNTHETIC TEST",48,85);ctx.fillStyle="#fff";ctx.font="14px sans-serif";ctx.fillText("Browser Video Studio",70,115)};
+   stage="recording synthetic browser video";
+   timer=setInterval(draw,1000/12);draw();
+   const stopped=new Promise((resolve,reject)=>{rec.onstop=resolve;rec.onerror=e=>reject(e.error||new Error("MediaRecorder failed."))});
+   rec.start();await new Promise(r=>setTimeout(r,2500));clearInterval(timer);timer=null;rec.stop();await stopped;
+   stream.getTracks().forEach(x=>x.stop());stream=null;
+   const webm=new Blob(chunks,{type:"video/webm"});if(!webm.size)throw new Error("Synthetic MediaRecorder generation produced an empty file.");
+   stage="loading FFmpeg WebAssembly and its worker";
+   const ff=await loadFFmpeg();
+   stage="writing synthetic input into FFmpeg";
+   await ff.writeFile("synthetic-test.webm",new Uint8Array(await webm.arrayBuffer()));
+   stage="encoding synthetic MP4 with H.264";
+   await ff.exec(["-i","synthetic-test.webm","-c:v","libx264","-pix_fmt","yuv420p","-an","synthetic-test.mp4"]);
+   stage="reading rendered MP4";
+   const out=await ff.readFile("synthetic-test.mp4");if(!out.length)throw new Error("Synthetic MP4 render was empty.");
+   stage="validating MP4 in browser video decoder";
+   const b=new Blob([out],{type:"video/mp4"}),v=document.createElement("video");objectUrl=URL.createObjectURL(b);
+   await new Promise((res,rej)=>{v.onloadedmetadata=res;v.onerror=()=>rej(new Error("Synthetic MP4 could not be decoded by this browser."));v.src=objectUrl});
+   if(!v.duration||v.videoWidth!==320)throw new Error("Synthetic output validation mismatch: duration="+v.duration+", width="+v.videoWidth+".");
+   return {source:webm.size,output:b.size,duration:v.duration,width:v.videoWidth};
+  }catch(err){
+   const detail=err?.message||err?.name||String(err);
+   throw new Error(stage+": "+detail);
+  }finally{
+   if(timer!==null)clearInterval(timer);
+   if(stream)stream.getTracks().forEach(x=>x.stop());
+   if(objectUrl)URL.revokeObjectURL(objectUrl);
+  }
+ }
+ $("test").onclick=async()=>{
  $("test").disabled=true;setStatus("intakeStatus","System test running with synthetic media only…","warn");progress(5);
  try{const r=await syntheticTest();setStatus("intakeStatus",`SELF-TEST PASSED • Synthetic input ${fmt(r.source)} → MP4 ${fmt(r.output)} • ${r.duration.toFixed(2)} sec • ${r.width}px wide. No user files used.`,"good");setLog("Synthetic capture, FFmpeg WebAssembly load, MP4 render and browser output validation passed.");progress(100)}
- catch(e){setStatus("intakeStatus","SELF-TEST FAILED: "+e.message,"bad");setLog("Self-test failed: "+e.message)}
+ catch(e){const detail=e?.message||e?.name||String(e);setStatus("intakeStatus","SELF-TEST FAILED: "+detail,"bad");setLog("Self-test failed: "+detail+(e?.stack?"\n"+e.stack:""))}
  finally{$("test").disabled=false}
 };
 </script>
