@@ -148,7 +148,7 @@ $("analyze").onclick=async()=>{
   $("analyze").disabled=true;setStatus("intakeStatus","Analyzing technical and audio signals…");progress(20);
   const ff=await loadFFmpeg(),name="draft-input";
   state.lastFFlog="";
-  await ff.exec(["-i",name,"-af","silencedetect=noise=-32dB:d=0.8","-f","null","-"]);
+  await ff.exec(["-i",name,"-vn","-af","silencedetect=noise=-32dB:d=0.8","-f","null","-"]);
   const logs=state.lastFFlog||"";
   const silences=[...logs.matchAll(/silence_start:\s*([\d.]+).*?silence_end:\s*([\d.]+).*?silence_duration:\s*([\d.]+)/gs)].map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
   state.edits=silences.filter(s=>s.duration>=1.5).slice(0,100).map((s,i)=>({id:i+1,start:Math.max(0,s.start+.15),end:Math.max(s.start+.15,s.end-.15),reason:`Detected silence (${s.duration.toFixed(1)} seconds)`,approved:false}));
