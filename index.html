@@ -111,7 +111,7 @@ async function loadFFmpeg(){
  const {toBlobURL}=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js");
  const ff=new FFmpeg();ff.on("log",({message})=>{if(message)state.lastFFlog=message});
  const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
- await ff.load({coreURL:await toBlobURL(base+"/ffmpeg-core.js","text/javascript"),wasmURL:await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm")});
+ await ff.load({coreURL:await toBlobURL(base+"/ffmpeg-core.js","text/javascript"),wasmURL:await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm"),classWorkerURL:new URL("./worker.js",window.location.href).href});
  state.ffmpeg=ff;return ff;
 }
 async function writeInput(ff,file,name="draft-input"){await ff.writeFile(name,new Uint8Array(await file.arrayBuffer()));return name}
