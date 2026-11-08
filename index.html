@@ -188,13 +188,24 @@ async function getAudioFloats(ff){
  const samples=decoded.getChannelData(0).slice();await ctx.close();return samples;
 }
 $("transcribe").onclick=async()=>{
- $("transcribe").disabled=true;setStatus("transcriptStatus","Loading Whisper Tiny English model. First use downloads model files from Hugging Face (not your video).","warn");
+ $("transcribe").disabled=true;setStatus("transcriptStatus","Loading the transcription library…","warn");
  try{
   const {pipeline,env}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1");
   env.allowLocalModels=false;env.useBrowserCache=true;
   const device=navigator.gpu?"webgpu":"wasm";
-  state.transcriber=state.transcriber||await pipeline("automatic-speech-recognition","onnx-community/whisper-tiny.en",{device,dtype:"q8"});
+  const progress_callback=(p)=>{
+   if(p&&p.status==="progress"&&Number.isFinite(p.progress)){
+    const pct=Math.max(0,Math.min(100,Math.round(p.progress)));
+    setStatus("transcriptStatus",`Downloading Whisper model files from Hugging Face: ${p.file||"model file"} • ${pct}%`,"warn");
+   }else if(p&&p.file){
+    setStatus("transcriptStatus",`Loading Whisper model file: ${p.file}`,"warn");
+   }
+  };
+  setStatus("transcriptStatus","Loading Whisper Tiny English model. First use downloads model files from Hugging Face (not your video).","warn");
+  state.transcriber=state.transcriber||await pipeline("automatic-speech-recognition","onnx-community/whisper-tiny.en",{device,dtype:"q8",progress_callback});
+  setStatus("transcriptStatus","Whisper model ready. Extracting audio from your video…","warn");
   const ff=await loadFFmpeg(),samples=await getAudioFloats(ff);
+  setStatus("transcriptStatus","Transcribing speech. A 33-minute video may take a while on this device…","warn");
   const result=await state.transcriber(samples,{chunk_length_s:25,stride_length_s:5});
   state.transcript=result.text||"";
   setStatus("transcriptStatus",state.transcript?("Transcript ready: "+state.transcript.slice(0,1200)+(state.transcript.length>1200?"…":"")):"No speech recognized.","good");
