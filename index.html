@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<title>Browser Video Studio</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--panel2:#1b2940;--line:#2b3b55;--txt:#f2f6fc;--muted:#a9b8cc;--accent:#79a9ff;--good:#5ed6a1;--warn:#ffcb70;--bad:#ff7e86}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(150deg,#101b2e,#09111e 60%);color:var(--txt);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:24px max(18px,calc((100vw - 1180px)/2));border-bottom:1px solid var(--line);background:#101a2bdc}
+h1{font-size:clamp(1.5rem,4vw,2.3rem);margin:0 0 4px}h2{font-size:1.2rem;margin:0 0 14px}h3{font-size:1rem;margin:0 0 8px}
+p{color:var(--muted);margin:6px 0 12px}.wrap{max-width:1180px;margin:auto;padding:22px 18px 60px}
+.notice{background:#192942;border:1px solid #355074;border-radius:14px;padding:14px 16px;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.panel{grid-column:span 12;background:linear-gradient(160deg,#152238,#111b2b);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 10px 30px #0002}
+.half{grid-column:span 6}.third{grid-column:span 4}
+@media(max-width:780px){.half,.third{grid-column:span 12}}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+button,.button{border:0;border-radius:12px;padding:13px 17px;font-weight:700;font-size:15px;cursor:pointer;background:var(--accent);color:#071326;min-height:48px}
+button.secondary{background:#263a57;color:var(--txt);border:1px solid #405776}button.good{background:var(--good)}button.warn{background:var(--warn)}button.danger{background:#6a2d3a;color:#fff}button:disabled{opacity:.4;cursor:not-allowed}
+input,select,textarea{background:#0b1525;color:var(--txt);border:1px solid #40516a;border-radius:9px;padding:11px;width:100%;font:inherit}
+label{display:block;color:#d6e0ef;font-weight:600;margin:8px 0 5px}.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:560px){.row2{grid-template-columns:1fr}}
+.small{font-size:.86rem;color:var(--muted)}.status{padding:9px 12px;border-radius:10px;background:#0b1525;border:1px solid var(--line);margin:8px 0;color:var(--muted)}
+.status.good{color:var(--good)}.status.warn{color:var(--warn)}.status.bad{color:var(--bad)}
+.meter{height:8px;background:#26354a;border-radius:9px;overflow:hidden}.meter>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:#d8e4f4}
+.scroll{overflow:auto}.editrow{display:grid;grid-template-columns:24px 100px 1fr 100px;gap:8px;align-items:center;padding:10px;border-bottom:1px solid var(--line)}@media(max-width:600px){.editrow{grid-template-columns:24px 1fr}.editrow>*:nth-child(n+3){grid-column:2}}
+video{width:100%;max-height:380px;background:#05080d;border-radius:10px;margin-top:10px}
+footer{max-width:1180px;margin:auto;padding:0 18px 30px;color:var(--muted);font-size:.82rem}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;background:#263a57;color:#dbe8fa;font-size:.8rem}
+.hidden{display:none!important}.checkline{display:flex;gap:8px;align-items:center}.checkline input{width:auto}
+</style>
+</head>
+<body>
+<header><h1>Browser Video Studio</h1><div class="small">Private, browser-based draft analysis, editorial review and MP4 production</div></header>
+<main class="wrap">
+<div class="notice"><strong>Privacy by design:</strong> Your selected Draft and Assets are processed inside this browser tab. They are not uploaded to this app or a video server. The optional Whisper model is downloaded from Hugging Face's public model CDN; your media is not sent there. Nothing is retained by this app after the tab closes unless you explicitly download an output. Do not select OneDrive or Zoom links here; those integrations are not connected.</div>
+<div class="grid">
+<section class="panel half">
+<h2>1. Draft intake</h2>
+<label for="draft">Choose or Upload Draft Video (MP4 or MOV)</label><input id="draft" type="file" accept="video/mp4,video/quicktime,.mp4,.mov">
+<div class="row2"><div><label for="title">Video title (optional)</label><input id="title" placeholder="Defaults to the filename"></div><div><label for="request">Request ID</label><input id="request" readonly></div></div>
+<div class="actions"><button id="analyze" disabled>Analyze Video</button><button id="new" class="secondary">Start New Video</button></div>
+<div id="intakeStatus" class="status">No draft selected.</div>
+<video id="preview" controls playsinline class="hidden"></video>
+</section>
+<section class="panel half">
+<h2>2. Technical report</h2>
+<div id="tech" class="status">Choose a draft to begin.</div>
+<div id="progress" class="meter"><i></i></div>
+<div id="log" class="small" aria-live="polite">Ready.</div>
+<div class="actions"><button id="test" class="warn">Test System</button></div>
+<p class="small">The test creates a short synthetic video in memory, validates it, renders an MP4 and checks the result. It does not use or overwrite your media.</p>
+</section>
+<section class="panel">
+<h2>3. Recommended edits & human approval</h2>
+<div class="actions"><button id="review" class="secondary" disabled>Review Recommended Edits</button><button id="workbook" class="secondary" disabled>Download Recommended Edits Workbook</button></div>
+<div id="transcriptStatus" class="status">Transcription has not run.</div>
+<div class="actions"><button id="transcribe" class="secondary" disabled>Transcribe Speech (Whisper)</button></div>
+<div id="edits"><p>No recommendations yet. Analyze a valid draft first.</p></div>
+<div class="actions"><button id="approve" class="good" disabled>Approve Selected Edits</button><button id="render" disabled>Create Final Video</button></div>
+<p class="small">Recommendations are derived from measured technical signals and transcription output. Review and approve each proposed cut before rendering. Transcript quality depends on the audio and model.</p>
+</section>
+<section class="panel half">
+<h2>4. Assets & podcast music</h2>
+<label for="assets">Add optional audio/music assets (MP3, WAV, M4A)</label><input id="assets" type="file" accept="audio/*" multiple>
+<div id="assetList" class="status">No assets added. Original assets are never modified.</div>
+<label for="musicVolume">Background music volume: <span id="volLabel">12%</span></label><input id="musicVolume" type="range" min="0" max="40" value="12">
+<p class="small">Audio asset mixing is optional. Music is looped and mixed beneath the original audio for the duration of the final cut. Music is not automatically licensed; use only media you have rights to use.</p>
+</section>
+<section class="panel half">
+<h2>5. Final output</h2>
+<div id="renderStatus" class="status">No final video created.</div>
+<div class="actions"><button id="download" disabled>Open or Download Final Video</button></div>
+<div id="outputInfo" class="small"></div>
+<video id="finalPreview" controls playsinline class="hidden"></video>
+</section>
+<section class="panel">
+<h2>System notes & service limits</h2>
+<ul class="small">
+<li>All editing, validation, audio extraction, rendering and workbook generation run on this device using WebAssembly/JavaScript. No server-side retention applies.</li>
+<li>FFmpeg WebAssembly and Whisper model files are fetched from public CDNs when first needed. Those downloads use bandwidth and may be cached by your browser. CDN operators may receive normal request metadata, but not your draft media.</li>
+<li>Whisper Tiny English is an optional model download (typically tens to roughly 100 MB, depending on model files). First-run time and RAM use vary. CPU fallback is slower; WebGPU support varies by browser/device.</li>
+<li>FFmpeg.wasm has much lower throughput and practical memory limits than desktop FFmpeg. Large/long/high-resolution videos may fail or exhaust browser memory. There is no fixed universal max file size; this app warns at 500 MB.</li>
+<li>Browser storage and memory quotas vary by device and browser. This app does not persist your media in IndexedDB or remote storage. Downloads are controlled by the browser.</li>
+<li>GitHub Pages, if later used for static hosting, currently documents a 1 GB published-site limit, 100 GB/month soft bandwidth limit, and 10-minute deployment timeout. Static hosting retains only application files, not user-selected video.</li>
+</ul>
+</section>
+</div>
+</main>
+<footer>Browser Video Studio • No account, server, paid API, credit card, or local installation required to run the app from a static HTTPS host. This is a client-side production tool; keep the browser tab open while processing.</footer>
+<script type="module">
+const $=id=>document.getElementById(id);
+const state={draft:null,meta:null,request:null,edits:[],approved:false,ffmpeg:null,finalBlob:null,finalName:null,assets:[],transcript:"",transcriber:null};
+const setLog=s=>{$("log").textContent=s};
+const setStatus=(id,msg,kind="")=>{$(id).className="status "+kind;$(id).textContent=msg};
+const progress=n=>$("progress").firstElementChild.style.width=n+"%";
+const fmt=n=>Number.isFinite(n)?(n>=1024*1024*1024?(n/1024/1024/1024).toFixed(2)+" GB":n>=1024*1024?(n/1024/1024).toFixed(1)+" MB":n+" bytes"):"—";
+const timecode=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=(s%60).toFixed(2);return [h,m,sec].map((v,i)=>i===2?String(v).padStart(5,"0"):String(v).padStart(2,"0")).join(":")};
+function requestId(){const d=new Date(),p=n=>String(n).padStart(2,"0");return `VP-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(16).slice(2,6)}`}
+$("request").value=requestId();
+$("musicVolume").oninput=e=>$("volLabel").textContent=e.target.value+"%";
+function fileTitle(f){return f.name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").trim()||"Untitled video"}
+async function sha256(file){const buf=await file.slice(0,Math.min(file.size,4*1024*1024)).arrayBuffer();const hash=await crypto.subtle.digest("SHA-256",buf);return [...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function durationMeta(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),v=document.createElement("video");v.preload="metadata";v.onloadedmetadata=()=>{const m={duration:v.duration,width:v.videoWidth,height:v.videoHeight};URL.revokeObjectURL(url);resolve(m)};v.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Browser could not decode this video. It may be corrupt or unsupported."))};v.src=url})}
+function probeFps(log){const m=log.match(/(\d+(?:\.\d+)?)\s*fps/);return m?Number(m[1]):null}
+async function loadFFmpeg(){
+ if(state.ffmpeg)return state.ffmpeg;
+ setLog("Loading FFmpeg WebAssembly core…");
+ const {FFmpeg}=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js");
+ const {toBlobURL}=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js");
+ const ff=new FFmpeg();ff.on("log",({message})=>{if(message)state.lastFFlog=message});
+ const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+ await ff.load({coreURL:await toBlobURL(base+"/ffmpeg-core.js","text/javascript"),wasmURL:await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm")});
+ state.ffmpeg=ff;return ff;
+}
+async function writeInput(ff,file,name="draft-input"){await ff.writeFile(name,new Uint8Array(await file.arrayBuffer()));return name}
+async function validate(file){
+ const ext=file.name.toLowerCase().split(".").pop(),mime=file.type;
+ if(!["mp4","mov"].includes(ext))throw new Error("Only MP4 and MOV files are accepted.");
+ if(!file.size)throw new Error("The selected file is empty.");
+ if(file.size>500*1024*1024)setStatus("intakeStatus","Large file warning: "+fmt(file.size)+". Browser memory may be insufficient; continuing only if your device can handle it.","warn");
+ const m=await durationMeta(file);if(!m.duration||!m.width||!m.height)throw new Error("No playable video stream or duration was found.");
+ const ff=await loadFFmpeg(),name=await writeInput(ff,file);
+ await ff.exec(["-hide_banner","-i",name]);
+ const log=state.lastFFlog||"";
+ const videoCodec=(log.match(/Video:\s*([^,\s]+)/)||[])[1]||"Browser-decoded (codec probe unavailable)";
+ const audioMatch=log.match(/Audio:\s*([^,\n]+)/);
+ const fps=probeFps(log);
+ const bitrate=(log.match(/bitrate:\s*([^,\n]+)/)||[])[1]||"not reported";
+ const audio=!!audioMatch;
+ const record={requestId:$("request").value,title:$("title").value.trim()||fileTitle(file),originalName:file.name,sourceType:"Browser upload",mimeType:mime||"unknown",extension:ext,size:file.size,receivedAt:new Date().toISOString(),validation:"Ready for Analysis",processing:"Validated",fingerprint:await sha256(file),workingId:"work-"+crypto.randomUUID(),workbookName:$("request").value+"-Recommended-Edits.xlsx",finalName:($("title").value.trim()||fileTitle(file)).replace(/[^\w -]/g,"").replace(/\s+/g,"-")+"-final.mp4",...m,videoCodec,audioCodec:audio?(audioMatch[1].split(",")[0]):"none",audioChannels:audio?(audioMatch[1].match(/(\d+)\s*channels/)||[])[1]||"not reported":"0",fps,bitrate};
+ state.meta=record;state.draft=file;
+ $("tech").innerHTML=`<div><b>Validation:</b> ${record.validation}</div><div><b>Title:</b> ${record.title}</div><div><b>Original:</b> ${record.originalName}</div><div><b>Size:</b> ${fmt(file.size)}</div><div><b>Duration:</b> ${timecode(m.duration)}</div><div><b>Dimensions:</b> ${m.width} × ${m.height}</div><div><b>Frame rate:</b> ${fps?fps+" fps":"not detected"}</div><div><b>Video codec:</b> ${videoCodec}</div><div><b>Audio:</b> ${audio?audioMatch[1]:"No audio stream (silent video warning)"}</div><div><b>Bitrate:</b> ${bitrate}</div><div><b>SHA-256 (first 4 MB fingerprint):</b> ${record.fingerprint}</div>`;
+ setStatus("intakeStatus",`Ready for analysis • ${file.name} • ${fmt(file.size)}${audio?"":" • Warning: no audio stream"}`,audio?"good":"warn");
+ $("analyze").disabled=false;$("transcribe").disabled=!audio;$("preview").src=URL.createObjectURL(file);$("preview").classList.remove("hidden");
+ return record;
+}
+$("draft").addEventListener("change",async e=>{
+ const f=e.target.files?.[0];if(!f)return;
+ $("analyze").disabled=true;$("review").disabled=true;$("workbook").disabled=true;$("approve").disabled=true;$("render").disabled=true;
+ setStatus("intakeStatus","Received • validating…");progress(5);
+ try{await validate(f);progress(100)}catch(err){setStatus("intakeStatus","Validation Failed: "+err.message,"bad");setStatus("tech","Validation failed. No analysis or render is available.","bad");setLog(err.message)}
+});
+$("analyze").onclick=async()=>{
+ try{
+  $("analyze").disabled=true;setStatus("intakeStatus","Analyzing technical and audio signals…");progress(20);
+  const ff=await loadFFmpeg(),name="draft-input";
+  await ff.exec(["-i",name,"-af","silencedetect=noise=-32dB:d=0.8","-f","null","-"]);
+  const logs=state.lastFFlog||"";
+  const silences=[...logs.matchAll(/silence_start:\s*([\d.]+).*?silence_end:\s*([\d.]+).*?silence_duration:\s*([\d.]+)/gs)].map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
+  state.edits=silences.filter(s=>s.duration>=1.5).slice(0,100).map((s,i)=>({id:i+1,start:Math.max(0,s.start+.15),end:Math.max(s.start+.15,s.end-.15),reason:`Detected silence (${s.duration.toFixed(1)} seconds)`,approved:false}));
+  if(!state.edits.length)state.edits=[{id:1,start:0,end:0,reason:"No long silence cut recommended. Keep full draft.",approved:false,keep:true}];
+  renderEdits();$("review").disabled=false;$("workbook").disabled=false;$("approve").disabled=false;
+  setStatus("intakeStatus","Analysis Complete • Awaiting Review","good");setStatus("transcriptStatus","Transcription optional. Run Whisper to create a transcript; no transcript is fabricated.");
+  progress(100);setLog(`Technical analysis complete. ${silences.length} silence intervals detected; ${state.edits.filter(e=>!e.keep).length} candidate cuts recommended.`);
+ }catch(e){setStatus("intakeStatus","Analysis Failed: "+e.message,"bad");setLog(e.message);$("analyze").disabled=false}
+};
+function renderEdits(){
+ const host=$("edits");host.innerHTML="";
+ if(!state.edits.length){host.textContent="No edit suggestions.";return}
+ const head=document.createElement("div");head.className="small";head.textContent="Select only the recommendations you approve. Suggested cuts remove measured silence; they are not automatic editorial judgments.";host.append(head);
+ state.edits.forEach(ed=>{
+  const row=document.createElement("div");row.className="editrow";
+  const cb=document.createElement("input");cb.type="checkbox";cb.checked=ed.approved;cb.disabled=!!ed.keep;cb.onchange=()=>{ed.approved=cb.checked;state.approved=false;$("render").disabled=true};
+  const t=document.createElement("span");t.className="small";t.textContent=ed.keep?"Keep full video":`${timecode(ed.start)}–${timecode(ed.end)}`;
+  const reason=document.createElement("span");reason.textContent=ed.reason;
+  const edit=document.createElement("span");edit.className="pill";edit.textContent=ed.keep?"KEEP":"CUT";
+  row.append(cb,t,reason,edit);host.append(row);
+ });
+}
+$("review").onclick=()=>{renderEdits();setLog("Review the measured silence intervals, then check the cuts you want to apply.")};
+$("approve").onclick=()=>{
+ if(!state.edits.length)return;
+ state.approved=true;$("render").disabled=false;
+ setStatus("renderStatus","Edits approved. Rendering is enabled.","good");
+};
+$("assets").onchange=e=>{
+ state.assets=[...state.assets,...[...e.target.files].filter(f=>f.size>0)];
+ $("assetList").textContent=state.assets.map(f=>`${f.name} (${fmt(f.size)})`).join(" • ")||"No assets added.";
+};
+async function getAudioFloats(ff){
+ await ff.exec(["-i","draft-input","-vn","-ac","1","-ar","16000","-f","wav","speech.wav"]);
+ const wav=await ff.readFile("speech.wav");
+ const ctx=new AudioContext({sampleRate:16000});const decoded=await ctx.decodeAudioData(wav.buffer.slice(wav.byteOffset,wav.byteOffset+wav.byteLength));
+ const samples=decoded.getChannelData(0).slice();await ctx.close();return samples;
+}
+$("transcribe").onclick=async()=>{
+ $("transcribe").disabled=true;setStatus("transcriptStatus","Loading Whisper Tiny English model. First use downloads model files from Hugging Face (not your video).","warn");
+ try{
+  const {pipeline,env}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1");
+  env.allowLocalModels=false;env.useBrowserCache=true;
+  const device=navigator.gpu?"webgpu":"wasm";
+  state.transcriber=state.transcriber||await pipeline("automatic-speech-recognition","onnx-community/whisper-tiny.en",{device,dtype:"q8"});
+  const ff=await loadFFmpeg(),samples=await getAudioFloats(ff);
+  const result=await state.transcriber(samples,{chunk_length_s:25,stride_length_s:5});
+  state.transcript=result.text||"";
+  setStatus("transcriptStatus",state.transcript?("Transcript ready: "+state.transcript.slice(0,1200)+(state.transcript.length>1200?"…":"")):"No speech recognized.","good");
+  state.meta.transcript=state.transcript;$("workbook").disabled=false;
+ }catch(e){setStatus("transcriptStatus","Transcription failed: "+e.message,"bad");setLog("Whisper error: "+e.message)}
+ finally{$("transcribe").disabled=false}
+};
+async function makeWorkbook(){
+ const rows=[["Request ID",state.meta.requestId],["Video title",state.meta.title],["Original filename",state.meta.originalName],["File size bytes",state.meta.size],["Duration seconds",state.meta.duration],["Width",state.meta.width],["Height",state.meta.height],["Video codec",state.meta.videoCodec],["Audio codec",state.meta.audioCodec],["Frame rate",state.meta.fps||"Not detected"],["Fingerprint (first 4 MB SHA-256)",state.meta.fingerprint],[],["Edit ID","Start (sec)","End (sec)","Recommendation","Approved"]];
+ state.edits.forEach(e=>rows.push([e.id,e.start,e.end,e.reason,e.approved?"YES":"NO"]));
+ rows.push([],["Transcript"],[state.transcript||"Not transcribed"]);
+ const XLSX=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Recommended Edits");
+ const bytes=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+ return new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+$("workbook").onclick=async()=>{
+ try{const blob=await makeWorkbook(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=state.meta.workbookName;a.click();setLog("Recommended Edits workbook generated and downloaded.");setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){setLog("Workbook error: "+e.message)}
+};
+async function renderVideo(){
+ if(!state.approved)throw new Error("Approve edits before rendering.");
+ const ff=await loadFFmpeg(),duration=state.meta.duration;
+ const cuts=state.edits.filter(e=>e.approved&&!e.keep).sort((a,b)=>a.start-b.start);
+ const keep=[];let cursor=0;
+ for(const c of cuts){if(c.start>cursor+.05)keep.push([cursor,c.start]);cursor=Math.max(cursor,c.end)}
+ if(duration>cursor+.05)keep.push([cursor,duration]);
+ if(!keep.length)throw new Error("All video time would be removed. Uncheck some cuts.");
+ const input="draft-input";
+ const filter=keep.map((_,i)=>`[0:v]trim=start=${keep[i][0]}:end=${keep[i][1]},setpts=PTS-STARTPTS[v${i}];[0:a]atrim=start=${keep[i][0]}:end=${keep[i][1]},asetpts=PTS-STARTPTS[a${i}]`).join(";");
+ const concat=keep.map((_,i)=>`[v${i}][a${i}]`).join("")+`concat=n=${keep.length}:v=1:a=1[v][a]`;
+ const args=["-i",input];
+ if(state.assets.length){await ff.writeFile("music-asset",new Uint8Array(await state.assets[0].arrayBuffer()));args.push("-stream_loop","-1","-i","music-asset")}
+ let fc=filter+";"+concat;
+ if(state.assets.length){const vol=Number($("musicVolume").value)/100;fc+=`;[1:a]volume=${vol},atrim=duration=${keep.reduce((s,x)=>s+x[1]-x[0],0)}[music];[a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]`}
+ args.push("-filter_complex",fc,"-map","[v]",...(state.assets.length?["-map","[aout]"]:["-map","[a]"]),"-c:v","libx264","-preset","ultrafast","-crf","25","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-movflags","+faststart","final-output.mp4");
+ await ff.exec(args);
+ const data=await ff.readFile("final-output.mp4");const blob=new Blob([data.buffer],{type:"video/mp4"});
+ if(!blob.size)throw new Error("FFmpeg returned an empty MP4.");
+ const url=URL.createObjectURL(blob);const v=document.createElement("video");v.preload="metadata";
+ await new Promise((res,rej)=>{v.onloadedmetadata=res;v.onerror=()=>rej(new Error("Rendered MP4 failed browser playback validation."));v.src=url});
+ if(!v.duration||v.videoWidth<1)throw new Error("Rendered MP4 failed duration/dimension validation.");
+ state.finalBlob=blob;state.finalName=state.meta.finalName;$("finalPreview").src=url;$("finalPreview").classList.remove("hidden");$("download").disabled=false;
+ $("outputInfo").textContent=`Validated output • ${fmt(blob.size)} • ${timecode(v.duration)} • ${v.videoWidth}×${v.videoHeight}`;
+ setStatus("renderStatus","Final MP4 rendered and playback-validated.","good");
+}
+$("render").onclick=async()=>{
+ $("render").disabled=true;setStatus("renderStatus","Rendering final MP4 in this browser. Keep this tab open…","warn");progress(10);
+ try{await renderVideo();progress(100);setLog("Render completed and output validation passed. Download is available.")}catch(e){setStatus("renderStatus","Render failed: "+e.message,"bad");setLog(e.message);$("render").disabled=false}
+};
+$("download").onclick=()=>{
+ if(!state.finalBlob)return;const url=URL.createObjectURL(state.finalBlob),a=document.createElement("a");a.href=url;a.download=state.finalName;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)
+};
+$("new").onclick=()=>{
+ if(state.ffmpeg){try{state.ffmpeg.terminate()}catch{}}
+ state.draft=null;state.meta=null;state.edits=[];state.approved=false;state.assets=[];state.transcript="";state.finalBlob=null;state.ffmpeg=null;
+ ["draft","assets"].forEach(id=>$(id).value="");$("request").value=requestId();$("preview").classList.add("hidden");$("finalPreview").classList.add("hidden");
+ $("analyze").disabled=true;$("review").disabled=true;$("workbook").disabled=true;$("transcribe").disabled=true;$("approve").disabled=true;$("render").disabled=true;$("download").disabled=true;
+ $("edits").textContent="No recommendations yet. Analyze a valid draft first.";$("assetList").textContent="No assets added.";$("outputInfo").textContent="";
+ setStatus("intakeStatus","No draft selected.");setStatus("tech","Choose a draft to begin.");setStatus("transcriptStatus","Transcription has not run.");setStatus("renderStatus","No final video created.");progress(0);setLog("Ready.")
+};
+async function syntheticTest(){
+ const canvas=document.createElement("canvas");canvas.width=320;canvas.height=180;const ctx=canvas.getContext("2d");
+ const stream=canvas.captureStream(12);const rec=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("video/webm;codecs=vp8")?"video/webm;codecs=vp8":"video/webm"});
+ const chunks=[];rec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+ let t=0;const draw=()=>{ctx.fillStyle="#13243a";ctx.fillRect(0,0,320,180);ctx.fillStyle="#80b4ff";ctx.font="bold 22px sans-serif";ctx.fillText("SYNTHETIC TEST",48,85);ctx.fillStyle="#fff";ctx.font="14px sans-serif";ctx.fillText("Browser Video Studio",70,115);t++};
+ const timer=setInterval(draw,1000/12);rec.start();await new Promise(r=>setTimeout(r,2500));clearInterval(timer);rec.stop();await new Promise(r=>rec.onstop=r);stream.getTracks().forEach(x=>x.stop());
+ const webm=new Blob(chunks,{type:"video/webm"});if(!webm.size)throw new Error("Synthetic MediaRecorder generation failed.");
+ const ff=await loadFFmpeg();await ff.writeFile("synthetic-test.webm",new Uint8Array(await webm.arrayBuffer()));
+ await ff.exec(["-i","synthetic-test.webm","-c:v","libx264","-pix_fmt","yuv420p","-an","synthetic-test.mp4"]);
+ const out=await ff.readFile("synthetic-test.mp4");if(!out.length)throw new Error("Synthetic MP4 render was empty.");
+ const b=new Blob([out.buffer],{type:"video/mp4"}),u=URL.createObjectURL(b),v=document.createElement("video");
+ await new Promise((res,rej)=>{v.onloadedmetadata=res;v.onerror=()=>rej(new Error("Synthetic MP4 could not be decoded."));v.src=u});
+ if(!v.duration||v.videoWidth!==320)throw new Error("Synthetic output validation mismatch.");
+ URL.revokeObjectURL(u);return {source:webm.size,output:b.size,duration:v.duration,width:v.videoWidth};
+}
+$("test").onclick=async()=>{
+ $("test").disabled=true;setStatus("intakeStatus","System test running with synthetic media only…","warn");progress(5);
+ try{const r=await syntheticTest();setStatus("intakeStatus",`SELF-TEST PASSED • Synthetic input ${fmt(r.source)} → MP4 ${fmt(r.output)} • ${r.duration.toFixed(2)} sec • ${r.width}px wide. No user files used.`,"good");setLog("Synthetic capture, FFmpeg WebAssembly load, MP4 render and browser output validation passed.");progress(100)}
+ catch(e){setStatus("intakeStatus","SELF-TEST FAILED: "+e.message,"bad");setLog("Self-test failed: "+e.message)}
+ finally{$("test").disabled=false}
+};
+</script>
+</body></html>
