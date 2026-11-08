@@ -1,0 +1,5 @@
+# Privacy statement
+
+Selected Draft Videos and optional assets are processed in the current browser tab. They are not uploaded to this application or a video-processing server. This application does not persist user media to remote storage or IndexedDB. Public CDN requests retrieve static code, FFmpeg WebAssembly, spreadsheet library code and (if requested) a Whisper model. CDN operators may observe ordinary network metadata. They do not receive the selected media from this application.
+
+The application keeps selected files and generated output in browser memory while the tab is open. Use the download button to save an output. Closing the tab releases in-memory app references; it cannot remove copies explicitly downloaded by the user. The browser's own download directory and CDN caches are outside this application's control.
