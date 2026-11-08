@@ -109,7 +109,7 @@ async function loadFFmpeg(){
  setLog("Loading FFmpeg WebAssembly core…");
  const {FFmpeg}=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js");
  const {toBlobURL}=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js");
- const ff=new FFmpeg();ff.on("log",({message})=>{if(message)state.lastFFlog=message});
+ const ff=new FFmpeg();ff.on("log",({message})=>{if(message)state.lastFFlog=(state.lastFFlog||"")+"\n"+message});
  const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
  await ff.load({coreURL:await toBlobURL(base+"/ffmpeg-core.js","text/javascript"),wasmURL:await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm"),classWorkerURL:new URL("./worker.js",window.location.href).href});
  state.ffmpeg=ff;return ff;
@@ -122,6 +122,7 @@ async function validate(file){
  if(file.size>500*1024*1024)setStatus("intakeStatus","Large file warning: "+fmt(file.size)+". Browser memory may be insufficient; continuing only if your device can handle it.","warn");
  const m=await durationMeta(file);if(!m.duration||!m.width||!m.height)throw new Error("No playable video stream or duration was found.");
  const ff=await loadFFmpeg(),name=await writeInput(ff,file);
+ state.lastFFlog="";
  await ff.exec(["-hide_banner","-i",name]);
  const log=state.lastFFlog||"";
  const videoCodec=(log.match(/Video:\s*([^,\s]+)/)||[])[1]||"Browser-decoded (codec probe unavailable)";
@@ -146,6 +147,7 @@ $("analyze").onclick=async()=>{
  try{
   $("analyze").disabled=true;setStatus("intakeStatus","Analyzing technical and audio signals…");progress(20);
   const ff=await loadFFmpeg(),name="draft-input";
+  state.lastFFlog="";
   await ff.exec(["-i",name,"-af","silencedetect=noise=-32dB:d=0.8","-f","null","-"]);
   const logs=state.lastFFlog||"";
   const silences=[...logs.matchAll(/silence_start:\s*([\d.]+).*?silence_end:\s*([\d.]+).*?silence_duration:\s*([\d.]+)/gs)].map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
